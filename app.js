@@ -11,6 +11,42 @@
     // =============================================
     const FRAMES = [
         {
+            id: 'retro_vibes',
+            name: 'Retro Vibes',
+            icon: '💖',
+            slots: 6,
+            layout: 'grid',
+            thumbBg: '#8b151b',
+            slotColors: ['#ffc0cb', '#ffc0cb', '#ffc0cb', '#ffc0cb', '#ffc0cb', '#ffc0cb'],
+            slotBgs: ['#fff', '#fff', '#fff', '#fff', '#fff', '#fff'],
+            stickers: [],
+            labels: ['RETRO', 'VIBES', 'LOVE', 'SWEET', 'HEART', 'FOREVER']
+        },
+        {
+            id: 'groovy',
+            name: '70s Groovy',
+            icon: '🌼',
+            slots: 6,
+            layout: 'grid',
+            thumbBg: '#ea580c',
+            slotColors: ['#fde047', '#fde047', '#fde047', '#fde047', '#fde047', '#fde047'],
+            slotBgs: ['#fff', '#fff', '#fff', '#fff', '#fff', '#fff'],
+            stickers: [],
+            labels: ['PEACE', 'GROOVY', 'SMILE', 'RETRO', 'HAPPY', 'HAPPINESS']
+        },
+        {
+            id: 'music_player',
+            name: 'Music Player',
+            icon: '🎧',
+            slots: 6,
+            layout: 'grid',
+            thumbBg: '#6366f1',
+            slotColors: ['#e0e7ff', '#e0e7ff', '#e0e7ff', '#e0e7ff', '#e0e7ff', '#e0e7ff'],
+            slotBgs: ['#fff', '#fff', '#fff', '#fff', '#fff', '#fff'],
+            stickers: [],
+            labels: ['Now Playing', 'Track 01', 'Favorites', 'On Repeat', 'Playlist', 'Best Hits']
+        },
+        {
             id: 'toystory',
             name: 'Toy Story',
             icon: '🤠',
@@ -186,8 +222,8 @@
 
             if (frame.layout === 'grid') {
                 const grid = document.createElement('div');
-                grid.className = 'frame-thumb-grid';
-                for (let i = 0; i < 4; i++) {
+                grid.className = 'frame-thumb-grid' + (frame.slots === 6 ? ' grid-6' : '');
+                for (let i = 0; i < frame.slots; i++) {
                     const slot = document.createElement('div');
                     slot.className = 'thumb-slot';
                     slot.style.borderColor = frame.slotColors[i] || '#ccc';
@@ -248,20 +284,16 @@
 
         let html = '';
 
-        // Toy Story special template preview
-        if (frame.id === 'toystory') {
-            html += `<div class="toystory-slots-wrapper">
-                <div class="photo-slot slot-0" id="photoSlot0">
-                    <div class="slot-placeholder"><span>1</span></div>
-                </div>
-                <div class="photo-slot slot-1" id="photoSlot1">
-                    <div class="slot-placeholder"><span>2</span></div>
-                </div>
-                <div class="photo-slot slot-2" id="photoSlot2">
-                    <div class="slot-placeholder"><span>3</span></div>
-                </div>
-            </div>
-            <img src="assets/toystory_overlay.png" class="toystory-overlay-img" alt="Toy Story Frame" />`;
+        // Overlay templates preview (Toy Story, Retro Vibes, Groovy, Music Player)
+        if (['toystory', 'retro_vibes', 'groovy', 'music_player'].includes(frame.id)) {
+            html += `<div class="${frame.id}-slots-wrapper">`;
+            for (let i = 0; i < frame.slots; i++) {
+                html += `<div class="photo-slot slot-${i}" id="photoSlot${i}">
+                    <div class="slot-placeholder"><span>${i + 1}</span></div>
+                </div>`;
+            }
+            html += `</div>
+            <img src="assets/${frame.id}_overlay.png" class="${frame.id}-overlay-img" alt="${frame.name} Frame" />`;
             stripContainer.innerHTML = html;
             return;
         }
@@ -524,13 +556,13 @@
     function resetBooth() {
         const frame = FRAMES[currentFrameIndex];
         photoCount = 0;
-        photos = [null, null, null, null];
+        photos = new Array(frame.slots).fill(null);
         photoCountEl.textContent = '0';
         btnDownload.disabled = true;
         stripContainer.classList.remove('completed');
 
         // Clear images from slots
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < frame.slots; i++) {
             const slot = document.getElementById('photoSlot' + i);
             if (slot) {
                 slot.classList.remove('filled', 'just-filled');
@@ -553,13 +585,17 @@
         const ctx = canvas.getContext('2d');
 
         // Dimensions
-        const W = frame.id === 'toystory' ? 1152 : 800;
-        const H = frame.id === 'toystory' ? 2048 : (frame.layout === 'grid' ? 1400 : 1600);
+        const isCustom6 = ['retro_vibes', 'groovy', 'music_player'].includes(frame.id);
+        const W = isCustom6 ? 1067 : (frame.id === 'toystory' ? 1152 : 800);
+        const H = isCustom6 ? 1600 : (frame.id === 'toystory' ? 2048 : (frame.layout === 'grid' ? 1400 : 1600));
         canvas.width = W;
         canvas.height = H;
 
         // Render based on frame type
         switch (frame.id) {
+            case 'retro_vibes': await renderRetroVibes(ctx, W, H); break;
+            case 'groovy': await renderGroovy(ctx, W, H); break;
+            case 'music_player': await renderMusicPlayer(ctx, W, H); break;
             case 'toystory': await renderToyStory(ctx, W, H); break;
             case 'kpop': await renderKpop(ctx, W, H); break;
             case 'mono': await renderMono(ctx, W, H); break;
@@ -572,6 +608,103 @@
         link.download = `photobooth-${frame.id}-${Date.now()}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
+    }
+
+    // =============================================
+    // CANVAS RENDERER: RETRO VIBES
+    // =============================================
+    async function renderRetroVibes(ctx, W, H) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+
+        const slots = [
+            { x: 96, y: 196, w: 421, h: 430 },
+            { x: 550, y: 196, w: 420, h: 430 },
+            { x: 96, y: 673, w: 421, h: 390 },
+            { x: 550, y: 673, w: 420, h: 390 },
+            { x: 96, y: 1110, w: 421, h: 390 },
+            { x: 550, y: 1110, w: 420, h: 390 }
+        ];
+
+        for (let i = 0; i < 6; i++) {
+            const s = slots[i];
+            if (photos[i]) {
+                const img = await loadImage(photos[i]);
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(s.x, s.y, s.w, s.h);
+                ctx.clip();
+                drawCover(ctx, img, s.x, s.y, s.w, s.h);
+                ctx.restore();
+            }
+        }
+
+        const overlayImg = await loadImage('assets/retro_vibes_overlay.png');
+        ctx.drawImage(overlayImg, 0, 0, W, H);
+    }
+
+    // =============================================
+    // CANVAS RENDERER: 70s GROOVY
+    // =============================================
+    async function renderGroovy(ctx, W, H) {
+        ctx.fillStyle = '#fcefd2';
+        ctx.fillRect(0, 0, W, H);
+
+        const slots = [
+            { x: 71, y: 122, w: 429, h: 376 },
+            { x: 565, y: 122, w: 430, h: 376 },
+            { x: 71, y: 553, w: 429, h: 375 },
+            { x: 565, y: 553, w: 430, h: 375 },
+            { x: 71, y: 983, w: 429, h: 375 },
+            { x: 565, y: 983, w: 430, h: 375 }
+        ];
+
+        for (let i = 0; i < 6; i++) {
+            const s = slots[i];
+            if (photos[i]) {
+                const img = await loadImage(photos[i]);
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(s.x, s.y, s.w, s.h);
+                ctx.clip();
+                drawCover(ctx, img, s.x, s.y, s.w, s.h);
+                ctx.restore();
+            }
+        }
+
+        const overlayImg = await loadImage('assets/groovy_overlay.png');
+        ctx.drawImage(overlayImg, 0, 0, W, H);
+    }
+
+    // =============================================
+    // CANVAS RENDERER: MUSIC PLAYER
+    // =============================================
+    async function renderMusicPlayer(ctx, W, H) {
+        ctx.fillStyle = '#f6f7fb';
+        ctx.fillRect(0, 0, W, H);
+
+        const slots = [
+            { x: 68, y: 243, w: 412, h: 289 },
+            { x: 586, y: 243, w: 412, h: 289 },
+            { x: 68, y: 580, w: 412, h: 290 },
+            { x: 586, y: 580, w: 412, h: 290 },
+            { x: 68, y: 918, w: 412, h: 289 },
+            { x: 586, y: 918, w: 412, h: 289 }
+        ];
+
+        for (let i = 0; i < 6; i++) {
+            const s = slots[i];
+            if (photos[i]) {
+                const img = await loadImage(photos[i]);
+                ctx.save();
+                roundRectClip(ctx, s.x, s.y, s.w, s.h, 12);
+                drawCover(ctx, img, s.x, s.y, s.w, s.h);
+                ctx.restore();
+            }
+        }
+
+        const overlayImg = await loadImage('assets/music_player_overlay.png');
+        ctx.drawImage(overlayImg, 0, 0, W, H);
     }
 
     // =============================================

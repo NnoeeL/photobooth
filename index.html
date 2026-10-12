@@ -84,7 +84,13 @@
             <section class="strip-panel" id="stripPanel">
                 <!-- Frame Selector -->
                 <div class="frame-selector">
-                    <h3 class="frame-selector-title">🖼️ Choose Frame</h3>
+                    <div class="frame-selector-header">
+                        <h3 class="frame-selector-title">🖼️ Choose Frame</h3>
+                        <button class="btn-custom-upload" id="btnCustomUpload" title="Unggah frame sendiri secara manual" type="button">
+                            <span>➕ Custom Frame</span>
+                        </button>
+                        <input type="file" id="customFrameInput" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+                    </div>
                     <div class="frame-options" id="frameOptions">
                         <!-- Populated by JS -->
                     </div>
@@ -108,6 +114,76 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Modal Custom Frame Setup -->
+    <div class="custom-modal-overlay" id="customModal" style="display: none;">
+        <div class="custom-modal-card">
+            <div class="custom-modal-header">
+                <div class="custom-modal-title">
+                    <span class="modal-icon">✨</span>
+                    <h3>Atur Frame Kustom</h3>
+                </div>
+                <button class="custom-modal-close" id="btnModalClose" type="button">&times;</button>
+            </div>
+            <div class="custom-modal-body">
+                <div class="modal-preview-pane">
+                    <div class="modal-frame-stage" id="modalFrameStage">
+                        <img id="modalFrameImg" alt="Frame Preview" />
+                        <div class="modal-slots-layer" id="modalSlotsLayer"></div>
+                    </div>
+                    <div class="modal-stage-info" id="modalStageInfo">Dimensi: -</div>
+                </div>
+                <div class="modal-config-pane">
+                    <div class="config-section">
+                        <label class="config-label">Pola Slot Foto</label>
+                        <div class="preset-pills" id="presetPills">
+                            <button type="button" class="preset-pill active" data-preset="auto">⚡ Auto Detect</button>
+                            <button type="button" class="preset-pill" data-preset="strip3">3 Strip</button>
+                            <button type="button" class="preset-pill" data-preset="grid4">4 Grid (2×2)</button>
+                            <button type="button" class="preset-pill" data-preset="grid6">6 Grid (2×3)</button>
+                            <button type="button" class="preset-pill" data-preset="single1">1 Penuh</button>
+                        </div>
+                        <div class="auto-detect-badge" id="autoDetectBadge" style="display: none;">
+                            ✅ Terdeteksi <span id="detectedCount">0</span> slot transparan otomatis!
+                        </div>
+                    </div>
+
+                    <div class="config-section manual-adjust-section" id="manualAdjustSection">
+                        <label class="config-label">Penyesuaian Posisi Slot</label>
+                        <div class="range-group">
+                            <div class="range-header">
+                                <span>Margin Luar</span>
+                                <span id="valMargin">8%</span>
+                            </div>
+                            <input type="range" id="inputMargin" min="0" max="35" value="8" />
+                        </div>
+                        <div class="range-group">
+                            <div class="range-header">
+                                <span>Jarak Antar Foto (Gap)</span>
+                                <span id="valGap">3%</span>
+                            </div>
+                            <input type="range" id="inputGap" min="0" max="25" value="3" />
+                        </div>
+                        <div class="range-group">
+                            <div class="range-header">
+                                <span>Posisi Vertikal (Offset Y)</span>
+                                <span id="valOffsetY">0%</span>
+                            </div>
+                            <input type="range" id="inputOffsetY" min="-20" max="20" value="0" />
+                        </div>
+                    </div>
+
+                    <div class="modal-notice">
+                        💡 <strong>Catatan:</strong> Frame ini dapat langsung dipakai foto dan diunduh. Jika halaman di-refresh/reload, frame kustom ini otomatis hilang.
+                    </div>
+                </div>
+            </div>
+            <div class="custom-modal-footer">
+                <button type="button" class="btn-modal-secondary" id="btnModalCancel">Batal</button>
+                <button type="button" class="btn-modal-primary" id="btnModalApply">✨ Gunakan Frame Ini</button>
+            </div>
+        </div>
     </div>
 
     <!-- Hidden canvas for final strip rendering -->

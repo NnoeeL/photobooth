@@ -148,6 +148,27 @@
     const finalCanvas = document.getElementById('finalCanvas');
     const bgParticles = document.getElementById('bgParticles');
 
+    // Custom Frame Modal DOM
+    const btnCustomUpload = document.getElementById('btnCustomUpload');
+    const customFrameInput = document.getElementById('customFrameInput');
+    const customModal = document.getElementById('customModal');
+    const btnModalClose = document.getElementById('btnModalClose');
+    const btnModalCancel = document.getElementById('btnModalCancel');
+    const btnModalApply = document.getElementById('btnModalApply');
+    const modalFrameImg = document.getElementById('modalFrameImg');
+    const modalSlotsLayer = document.getElementById('modalSlotsLayer');
+    const modalStageInfo = document.getElementById('modalStageInfo');
+    const presetPills = document.getElementById('presetPills');
+    const autoDetectBadge = document.getElementById('autoDetectBadge');
+    const detectedCountEl = document.getElementById('detectedCount');
+    const manualAdjustSection = document.getElementById('manualAdjustSection');
+    const inputMargin = document.getElementById('inputMargin');
+    const inputGap = document.getElementById('inputGap');
+    const inputOffsetY = document.getElementById('inputOffsetY');
+    const valMargin = document.getElementById('valMargin');
+    const valGap = document.getElementById('valGap');
+    const valOffsetY = document.getElementById('valOffsetY');
+
     // =============================================
     // STATE
     // =============================================
@@ -158,6 +179,14 @@
     let timerSeconds = 3;
     let isCapturing = false;
     let stream = null;
+
+    // Custom frame state (in-memory only, disappears on refresh)
+    let tempCustomImg = null;
+    let tempCustomDataUrl = null;
+    let tempCustomFileName = '';
+    let detectedSlots = null;
+    let currentCustomPreset = 'auto';
+    let currentCustomSlots = [];
 
     // =============================================
     // INIT
@@ -213,14 +242,20 @@
         frameOptionsEl.innerHTML = '';
         FRAMES.forEach((frame, idx) => {
             const btn = document.createElement('button');
-            btn.className = 'frame-option' + (idx === 0 ? ' active' : '');
+            btn.className = 'frame-option' + (idx === currentFrameIndex ? ' active' : '');
             btn.dataset.frameIndex = idx;
 
             const thumbDiv = document.createElement('div');
             thumbDiv.className = 'frame-thumb';
             thumbDiv.style.background = frame.thumbBg;
 
-            if (frame.layout === 'grid') {
+            if (frame.layout === 'custom') {
+                const img = document.createElement('img');
+                img.src = frame.customOverlayUrl;
+                img.className = 'custom-thumb-img';
+                img.alt = frame.name;
+                thumbDiv.appendChild(img);
+            } else if (frame.layout === 'grid') {
                 const grid = document.createElement('div');
                 grid.className = 'frame-thumb-grid' + (frame.slots === 6 ? ' grid-6' : '');
                 for (let i = 0; i < frame.slots; i++) {
@@ -279,10 +314,32 @@
         // Remove all frame classes
         stripContainer.className = 'strip-container frame-' + frame.id;
 
+        let html = '';
+
+        // Custom uploaded frame preview
+        if (frame.layout === 'custom') {
+            stripContainer.style.aspectRatio = `${frame.naturalWidth} / ${frame.naturalHeight}`;
+            html += `<div class="custom-slots-wrapper">`;
+            for (let i = 0; i < frame.slots; i++) {
+                const s = frame.customSlots[i];
+                const left = ((s.x / frame.naturalWidth) * 100).toFixed(2);
+                const top = ((s.y / frame.naturalHeight) * 100).toFixed(2);
+                const width = ((s.w / frame.naturalWidth) * 100).toFixed(2);
+                const height = ((s.h / frame.naturalHeight) * 100).toFixed(2);
+                html += `<div class="photo-slot slot-${i}" id="photoSlot${i}" style="position: absolute; left: ${left}%; top: ${top}%; width: ${width}%; height: ${height}%; overflow: hidden; border-radius: 4px;">
+                    <div class="slot-placeholder"><span>${i + 1}</span></div>
+                </div>`;
+            }
+            html += `</div>
+            <img src="${frame.customOverlayUrl}" class="custom-overlay-img" alt="${frame.name}" />`;
+            stripContainer.innerHTML = html;
+            return;
+        } else {
+            stripContainer.style.aspectRatio = '';
+        }
+
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-
-        let html = '';
 
         // Overlay templates preview (Toy Story, Retro Vibes, Groovy, Music Player)
         if (['toystory', 'retro_vibes', 'groovy', 'music_player'].includes(frame.id)) {
@@ -455,6 +512,297 @@
                 timerSeconds = parseInt(btn.dataset.timer, 10);
             });
         });
+
+        // Custom Frame Upload & Modal Events
+        if (btnCustomUpload) {
+            btnCustomUpload.addEventListener('click', () => {
+                customFrameInput.click();
+            });
+        }
+
+        if (customFrameInput) {
+            customFrameInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const dataUrl = ev.target.result;
+                    const img = new Image();
+                    img.onload = () => {
+                        openCustomModal(img, dataUrl, file.name);
+                    };
+                    img.src = dataUrl;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        if (btnModalClose) btnModalClose.addEventListener('click', closeCustomModal);
+        if (btnModalCancel) btnModalCancel.addEventListener('click', closeCustomModal);
+        if (customModal) {
+            customModal.addEventListener('click', (e) => {
+                if (e.target === customModal) closeCustomModal();
+            });
+        }
+
+        if (presetPills) {
+            presetPills.addEventListener('click', (e) => {
+                const btn = e.target.closest('.preset-pill');
+                if (!btn) return;
+                setPreset(btn.dataset.preset);
+            });
+        }
+
+        [inputMargin, inputGap, inputOffsetY].forEach((inp) => {
+            if (inp) inp.addEventListener('input', updateModalSlots);
+        });
+
+        if (btnModalApply) btnModalApply.addEventListener('click', applyCustomFrame);
+    }
+
+    // =============================================
+    // CUSTOM FRAME AUTO-DETECTION & CONFIGURATION
+    // =============================================
+    function detectTransparentSlots(img) {
+        try {
+            const maxDim = 320;
+            const scale = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
+            const sw = Math.max(20, Math.round(img.naturalWidth * scale));
+            const sh = Math.max(20, Math.round(img.naturalHeight * scale));
+
+            const cvs = document.createElement('canvas');
+            cvs.width = sw;
+            cvs.height = sh;
+            const ctx = cvs.getContext('2d');
+            ctx.drawImage(img, 0, 0, sw, sh);
+            const idata = ctx.getImageData(0, 0, sw, sh);
+            const data = idata.data;
+
+            let transCount = 0;
+            const grid = new Uint8Array(sw * sh);
+            for (let y = 0; y < sh; y++) {
+                for (let x = 0; x < sw; x++) {
+                    const idx = (y * sw + x) * 4;
+                    if (data[idx + 3] < 80) { // transparent cutout
+                        grid[y * sw + x] = 1;
+                        transCount++;
+                    }
+                }
+            }
+
+            // Need at least 2% transparency to qualify as transparent frame
+            if (transCount < (sw * sh * 0.02)) return null;
+
+            const visited = new Uint8Array(sw * sh);
+            const boxes = [];
+            const queue = new Int32Array(sw * sh * 2);
+
+            for (let y = 0; y < sh; y++) {
+                for (let x = 0; x < sw; x++) {
+                    if (grid[y * sw + x] === 1 && !visited[y * sw + x]) {
+                        let minX = x, maxX = x, minY = y, maxY = y;
+                        let count = 0;
+                        visited[y * sw + x] = 1;
+                        let head = 0, tail = 0;
+                        queue[tail++] = x;
+                        queue[tail++] = y;
+
+                        while (head < tail) {
+                            const cx = queue[head++];
+                            const cy = queue[head++];
+                            count++;
+                            if (cx < minX) minX = cx;
+                            if (cx > maxX) maxX = cx;
+                            if (cy < minY) minY = cy;
+                            if (cy > maxY) maxY = cy;
+
+                            const neighbors = [
+                                [cx + 1, cy], [cx - 1, cy],
+                                [cx, cy + 1], [cx, cy - 1]
+                            ];
+                            for (let i = 0; i < 4; i++) {
+                                const nx = neighbors[i][0];
+                                const ny = neighbors[i][1];
+                                if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
+                                    const nidx = ny * sw + nx;
+                                    if (grid[nidx] === 1 && !visited[nidx]) {
+                                        visited[nidx] = 1;
+                                        queue[tail++] = nx;
+                                        queue[tail++] = ny;
+                                    }
+                                }
+                            }
+                        }
+
+                        const bw = maxX - minX + 1;
+                        const bh = maxY - minY + 1;
+                        // Minimum slot area: 1.5% of canvas, dimensions > 15px
+                        if (count > (sw * sh * 0.015) && bw > 15 && bh > 15) {
+                            boxes.push({
+                                x: Math.round(minX / scale),
+                                y: Math.round(minY / scale),
+                                w: Math.round(bw / scale),
+                                h: Math.round(bh / scale)
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (boxes.length === 0) return null;
+
+            // Sort boxes: top-to-bottom with row grouping threshold, then left-to-right
+            const rowThreshold = img.naturalHeight * 0.06;
+            boxes.sort((a, b) => {
+                if (Math.abs(a.y - b.y) > rowThreshold) return a.y - b.y;
+                return a.x - b.x;
+            });
+
+            return boxes;
+        } catch (e) {
+            console.warn('Auto-detect transparent slots error:', e);
+            return null;
+        }
+    }
+
+    function calculatePresetSlots(W, H, preset, marginPct, gapPct, offsetYPct) {
+        let cols = 1, rows = 3;
+        if (preset === 'strip3') { cols = 1; rows = 3; }
+        else if (preset === 'grid4') { cols = 2; rows = 2; }
+        else if (preset === 'grid6') { cols = 2; rows = 3; }
+        else if (preset === 'single1') { cols = 1; rows = 1; }
+
+        const mX = W * (marginPct / 100);
+        const mY = H * (marginPct / 100);
+        const gX = W * (gapPct / 100);
+        const gY = H * (gapPct / 100);
+        const offY = H * (offsetYPct / 100);
+
+        const usableW = Math.max(50, W - 2 * mX - (cols - 1) * gX);
+        const usableH = Math.max(50, H - 2 * mY - (rows - 1) * gY);
+        const slotW = Math.max(20, Math.round(usableW / cols));
+        const slotH = Math.max(20, Math.round(usableH / rows));
+
+        const slots = [];
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const x = Math.round(mX + c * (slotW + gX));
+                const y = Math.round(mY + offY + r * (slotH + gY));
+                slots.push({ x, y, w: slotW, h: slotH });
+            }
+        }
+        return slots;
+    }
+
+    function openCustomModal(img, dataUrl, fileName) {
+        tempCustomImg = img;
+        tempCustomDataUrl = dataUrl;
+        tempCustomFileName = fileName;
+        modalFrameImg.src = dataUrl;
+        modalStageInfo.textContent = `Dimensi: ${img.naturalWidth} × ${img.naturalHeight} px`;
+
+        // Check auto-detect
+        detectedSlots = detectTransparentSlots(img);
+        if (detectedSlots && detectedSlots.length >= 1) {
+            detectedCountEl.textContent = detectedSlots.length;
+            autoDetectBadge.style.display = 'block';
+            setPreset('auto');
+        } else {
+            autoDetectBadge.style.display = 'none';
+            const ratio = img.naturalHeight / img.naturalWidth;
+            setPreset(ratio > 1.6 ? 'strip3' : 'grid4');
+        }
+
+        customModal.style.display = 'flex';
+    }
+
+    function closeCustomModal() {
+        customModal.style.display = 'none';
+        customFrameInput.value = '';
+    }
+
+    function setPreset(preset) {
+        currentCustomPreset = preset;
+        document.querySelectorAll('.preset-pill').forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.preset === preset);
+        });
+
+        if (preset === 'auto') {
+            if (detectedSlots && detectedSlots.length >= 1) {
+                manualAdjustSection.style.opacity = '0.4';
+                manualAdjustSection.style.pointerEvents = 'none';
+            } else {
+                alert('Tidak ditemukan area transparan. Silakan pilih pola 3 Strip, 4 Grid, atau 6 Grid.');
+                setPreset('grid4');
+                return;
+            }
+        } else {
+            manualAdjustSection.style.opacity = '1';
+            manualAdjustSection.style.pointerEvents = 'auto';
+        }
+
+        updateModalSlots();
+    }
+
+    function updateModalSlots() {
+        if (!tempCustomImg) return;
+        const W = tempCustomImg.naturalWidth;
+        const H = tempCustomImg.naturalHeight;
+
+        const margin = parseInt(inputMargin.value, 10);
+        const gap = parseInt(inputGap.value, 10);
+        const offsetY = parseInt(inputOffsetY.value, 10);
+
+        valMargin.textContent = margin + '%';
+        valGap.textContent = gap + '%';
+        valOffsetY.textContent = (offsetY > 0 ? '+' : '') + offsetY + '%';
+
+        if (currentCustomPreset === 'auto' && detectedSlots && detectedSlots.length >= 1) {
+            currentCustomSlots = detectedSlots;
+        } else {
+            currentCustomSlots = calculatePresetSlots(W, H, currentCustomPreset, margin, gap, offsetY);
+        }
+
+        // Render preview boxes on stage
+        modalSlotsLayer.innerHTML = '';
+        currentCustomSlots.forEach((s, idx) => {
+            const box = document.createElement('div');
+            box.className = 'modal-slot-box';
+            box.style.left = ((s.x / W) * 100).toFixed(2) + '%';
+            box.style.top = ((s.y / H) * 100).toFixed(2) + '%';
+            box.style.width = ((s.w / W) * 100).toFixed(2) + '%';
+            box.style.height = ((s.h / H) * 100).toFixed(2) + '%';
+            box.textContent = (idx + 1);
+            modalSlotsLayer.appendChild(box);
+        });
+    }
+
+    function applyCustomFrame() {
+        if (!tempCustomImg || !currentCustomSlots || currentCustomSlots.length === 0) return;
+
+        const frameId = 'custom_' + Date.now();
+        const baseName = (tempCustomFileName || 'Custom').replace(/\.[^/.]+$/, '').trim().slice(0, 14);
+        const newFrame = {
+            id: frameId,
+            name: baseName || 'Custom Frame',
+            icon: '✨',
+            slots: currentCustomSlots.length,
+            layout: 'custom',
+            thumbBg: '#1e293b',
+            slotColors: new Array(currentCustomSlots.length).fill('#fff'),
+            slotBgs: new Array(currentCustomSlots.length).fill('#fff'),
+            stickers: [],
+            labels: [],
+            customOverlayUrl: tempCustomDataUrl,
+            customSlots: currentCustomSlots,
+            naturalWidth: tempCustomImg.naturalWidth,
+            naturalHeight: tempCustomImg.naturalHeight
+        };
+
+        FRAMES.push(newFrame);
+        buildFrameSelector();
+        selectFrame(FRAMES.length - 1);
+        closeCustomModal();
     }
 
     // =============================================
@@ -583,6 +931,40 @@
 
         const canvas = finalCanvas;
         const ctx = canvas.getContext('2d');
+
+        // Custom uploaded frame render
+        if (frame.layout === 'custom') {
+            const W = frame.naturalWidth;
+            const H = frame.naturalHeight;
+            canvas.width = W;
+            canvas.height = H;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, W, H);
+
+            for (let i = 0; i < frame.slots; i++) {
+                const s = frame.customSlots[i];
+                if (photos[i]) {
+                    const img = await loadImage(photos[i]);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(s.x, s.y, s.w, s.h);
+                    ctx.clip();
+                    drawCover(ctx, img, s.x, s.y, s.w, s.h);
+                    ctx.restore();
+                }
+            }
+
+            if (frame.customOverlayUrl) {
+                const overlayImg = await loadImage(frame.customOverlayUrl);
+                ctx.drawImage(overlayImg, 0, 0, W, H);
+            }
+
+            const link = document.createElement('a');
+            link.download = `photobooth-${frame.id}-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            return;
+        }
 
         // Dimensions
         const isCustom6 = ['retro_vibes', 'groovy', 'music_player'].includes(frame.id);

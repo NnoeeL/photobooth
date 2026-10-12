@@ -20,6 +20,11 @@ Aplikasi photobooth interaktif berbasis web (HTML5, CSS3, Vanilla JavaScript) de
   6. **🖤 Monochrome Chic (3 Slot)** — Strip foto monokrom vertikal minimalis dan elegan dengan aksen bintang.
   7. **🎞️ Vintage Retro (3 Slot)** — Strip analog klasik bernuansa hangat nostalgia.
   8. **🎈 Cartoon Fun (4 Slot)** — Format strip pop-art komik ceria penuh warna.
+- ✨ **Custom Frame Upload (In-Memory)**: 
+  - Pengguna dapat mengunggah template frame sendiri (`.png`, `.jpg`, `.webp`) secara manual.
+  - **Auto-Detection**: Secara otomatis mendeteksi kotak foto transparan pada file PNG transparan.
+  - **Layout Presets**: Menyediakan preset manual (3 Strip, 4 Grid, 6 Grid, 1 Single) beserta penyesuaian margin, gap, dan offset vertikal.
+  - **Session-Only / In-Memory**: Frame kustom tidak disimpan permanen di server maupun local storage; otomatis terhapus ketika halaman di-refresh/reload.
 - 💾 **Download High-Resolution**: Foto dirender otomatis ke elemen HTML5 Canvas beresolusi tinggi dan diunduh langsung dalam format `.png`.
 - 📱 **Desain Responsif**: Tampilan antarmuka adaptif dan nyaman digunakan di perangkat desktop, tablet, maupun smartphone.
 

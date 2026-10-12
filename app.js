@@ -11,6 +11,22 @@
     // =============================================
     const FRAMES = [
         {
+            id: 'toystory',
+            name: 'Toy Story',
+            icon: '🤠',
+            slots: 3,
+            layout: 'vertical',
+            thumbBg: '#0c3494',
+            slotColors: ['#e52521', '#facc15', '#22c55e'],
+            slotBgs: ['#c6e9fc', '#c6e9fc', '#c6e9fc'],
+            stickers: [
+                { emoji: '🤠', pos: 'pos-tl' },
+                { emoji: '🚀', pos: 'pos-tr' },
+                { emoji: '👾', pos: 'pos-br' },
+            ],
+            labels: ['Woody & Jessie', 'Buzz Lightyear', 'Aliens'],
+        },
+        {
             id: 'kpop',
             name: 'K-Pop Wave',
             icon: '🎵',
@@ -231,6 +247,24 @@
         const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
         let html = '';
+
+        // Toy Story special template preview
+        if (frame.id === 'toystory') {
+            html += `<div class="toystory-slots-wrapper">
+                <div class="photo-slot slot-0" id="photoSlot0">
+                    <div class="slot-placeholder"><span>1</span></div>
+                </div>
+                <div class="photo-slot slot-1" id="photoSlot1">
+                    <div class="slot-placeholder"><span>2</span></div>
+                </div>
+                <div class="photo-slot slot-2" id="photoSlot2">
+                    <div class="slot-placeholder"><span>3</span></div>
+                </div>
+            </div>
+            <img src="assets/toystory_overlay.png" class="toystory-overlay-img" alt="Toy Story Frame" />`;
+            stripContainer.innerHTML = html;
+            return;
+        }
 
         // Header (shared)
         html += `<div class="strip-header">
@@ -519,13 +553,14 @@
         const ctx = canvas.getContext('2d');
 
         // Dimensions
-        const W = 800;
-        const H = frame.layout === 'grid' ? 1400 : 1600;
+        const W = frame.id === 'toystory' ? 1152 : 800;
+        const H = frame.id === 'toystory' ? 2048 : (frame.layout === 'grid' ? 1400 : 1600);
         canvas.width = W;
         canvas.height = H;
 
         // Render based on frame type
         switch (frame.id) {
+            case 'toystory': await renderToyStory(ctx, W, H); break;
             case 'kpop': await renderKpop(ctx, W, H); break;
             case 'mono': await renderMono(ctx, W, H); break;
             case 'retro': await renderRetro(ctx, W, H); break;
@@ -537,6 +572,52 @@
         link.download = `photobooth-${frame.id}-${Date.now()}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
+    }
+
+    // =============================================
+    // CANVAS RENDERER: TOY STORY
+    // =============================================
+    async function renderToyStory(ctx, W, H) {
+        const scale = W / 576;
+
+        // Background
+        ctx.fillStyle = '#0c3494';
+        ctx.fillRect(0, 0, W, H);
+
+        const slotTops = [57, 380, 705];
+        const slotLeft = 146;
+        const slotW = 286;
+        const slotH = 262;
+
+        for (let i = 0; i < 3; i++) {
+            const sx = slotLeft * scale;
+            const sy = slotTops[i] * scale;
+            const sw = slotW * scale;
+            const sh = slotH * scale;
+
+            if (photos[i]) {
+                const img = await loadImage(photos[i]);
+                ctx.save();
+                roundRectClip(ctx, sx, sy, sw, sh, 36);
+                drawCover(ctx, img, sx, sy, sw, sh);
+                ctx.restore();
+            } else {
+                ctx.save();
+                roundRectClip(ctx, sx, sy, sw, sh, 36);
+                const skyGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
+                skyGrad.addColorStop(0, '#c6e9fc');
+                skyGrad.addColorStop(0.5, '#ebf9fe');
+                skyGrad.addColorStop(0.7, '#c8e37c');
+                skyGrad.addColorStop(1, '#88a201');
+                ctx.fillStyle = skyGrad;
+                ctx.fillRect(sx, sy, sw, sh);
+                ctx.restore();
+            }
+        }
+
+        // Draw pixel-perfect Toy Story overlay on top
+        const overlayImg = await loadImage('assets/toystory_overlay.png');
+        ctx.drawImage(overlayImg, 0, 0, W, H);
     }
 
     // =============================================
